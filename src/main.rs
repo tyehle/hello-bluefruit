@@ -99,5 +99,28 @@ fn main() -> ! {
 
 #[interrupt]
 fn USB() {
+    unsafe {
+        USB_BUS.as_mut().map(|usb_dev| {
+            USB_SERIAL.as_mut().map(|serial| {
+                usb_dev.poll(&mut [serial]);
+                let mut buf = [0u8; 64];
 
+                if let Ok(count) = serial.read(&mut buf) {
+                    for (i, c) in buf.iter().enumerate() {
+                        if i > count {
+                            break;
+                        }
+                        serial.write("[".as_bytes());
+                        serial.write(&[c.clone()]);
+                        serial.write(", ".as_bytes());
+                        serial.write(&[((c/100)%10 + 48) as u8, ((c/10)%10 + 48) as u8, (c%10 + 48) as u8]);
+                        serial.write(", ".as_bytes());
+                        serial.write(&[((i/10)%10 + 48) as u8, (i%10 + 48) as u8]);
+                        serial.write("]\r\n".as_bytes());
+                    }
+                    serial.write("-----\r\n".as_bytes());
+                }
+            });
+        });
+    }
 }
