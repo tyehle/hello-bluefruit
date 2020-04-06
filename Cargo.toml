@@ -14,6 +14,7 @@ feather_m0 = { version="0.6", features=[] }
 usb-device = "0.2"
 usbd-serial = "0.1"
 atsamd-hal = { version="0.8", features=["samd21g18a", "samd21g18a-rt", "usb"] }
+embedded-hal = "0.2"
 
 # Uncomment for the panic example.
 # panic-itm = "0.4.1"
