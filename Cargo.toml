@@ -13,7 +13,7 @@ cortex-m-semihosting = "0.3.3"
 embedded-hal = "0.2"
 feather_m0 = { version="0.6", features=[] }
 heapless ="0.5"
-panic-halt = "0.2.0"
+# panic-halt = "0.2.0"
 usb-device = "0.2"
 usbd-serial = "0.1"
 
