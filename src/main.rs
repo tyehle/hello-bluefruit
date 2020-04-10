@@ -33,21 +33,48 @@ static USB_BUS: Mutex<RefCell<Option<UsbDevice<UsbBus>>>> = Mutex::new(RefCell::
 static USB_SERIAL: Mutex<RefCell<Option<SerialPort<UsbBus>>>> = Mutex::new(RefCell::new(None));
 
 
+fn flash_n(led: &mut hal::gpio::Pa17<hal::gpio::Output<hal::gpio::OpenDrain>>, n: u32) {
+    let pause = 15_000;
+    let mut started = false;
+
+    for place in (0..9).rev() {
+        let digit = (n / 10u32.pow(place)) % 10;
+
+        if digit == 0 {
+            if started {
+                led.set_high().unwrap_or(());
+                (0..pause*3).sum::<u32>();
+                led.set_low().unwrap_or(());
+                (0..pause).sum::<u32>();
+            } else {
+                continue;
+            }
+        }
+
+        started = true;
+
+        for _ in 0..digit {
+            led.set_high().unwrap_or(());
+            (0..pause).sum::<u32>();
+            led.set_low().unwrap_or(());
+            (0..pause).sum::<u32>();
+        }
+        (0..2*pause).sum::<u32>();
+    }
+    (0..6*pause).sum::<u32>();
+}
+
+
 #[panic_handler]
-fn panic_impl(_info: &core::panic::PanicInfo) -> ! {
+fn panic_impl(info: &core::panic::PanicInfo) -> ! {
     match unsafe { LIGHT.as_mut() } {
-        None => loop { },
+        None => loop {},
+
         Some(led) => {
-            // (0..100_000).sum::<u32>();
+            let line = info.location().unwrap().line();
             loop {
-                led.set_high().unwrap_or(());
-                (0..10_000).sum::<u32>();
-                led.set_low().unwrap_or(());
-                (0..10_000).sum::<u32>();
-                led.set_high().unwrap_or(());
-                (0..10_000).sum::<u32>();
-                led.set_low().unwrap_or(());
-                (0..60_000).sum::<u32>();
+                // flash a line number
+                flash_n(led, line);
             }
         },
     }
@@ -95,38 +122,22 @@ fn main() -> ! {
     red_led.set_high().unwrap();
 
     cortex_m::interrupt::free(|cs| {
-        let serial = Some(SerialPort::new(&bus_allocator));
-        let cell = USB_SERIAL.borrow(cs);
-        // red_led.set_low().unwrap();
-        // delay.delay_ms(1u8);
-        cell.replace(serial);
-    });
+        let serial = SerialPort::new(&bus_allocator);
+        USB_SERIAL.borrow(cs).replace(Some(serial));
 
-    cortex_m::interrupt::free(|cs| {
-        let bus = Some(UsbDeviceBuilder::new(&bus_allocator, UsbVidPid(0x16c0, 0x27dd))
+        let bus = UsbDeviceBuilder::new(&bus_allocator, UsbVidPid(0x16c0, 0x27dd))
             .manufacturer("Fake company")
             .product("Serial port")
             .serial_number("TEST")
             .device_class(USB_CLASS_CDC)
-            .build());
-        USB_BUS.borrow(cs).replace(bus);
+            .build();
+        USB_BUS.borrow(cs).replace(Some(bus));
     });
-
-    // unsafe {
-    //     USB_BUS = Some(UsbDeviceBuilder::new(&bus_allocator, UsbVidPid(0x16c0, 0x27dd))
-    //         .manufacturer("Fake company")
-    //         .product("Serial port")
-    //         .serial_number("TEST")
-    //         .device_class(USB_CLASS_CDC)
-    //         .build());
-    //     // USB_BUS.as_ref().unwrap()
-    // };
 
     unsafe {
         core.NVIC.set_priority(interrupt::USB, 1);
         NVIC::unmask(interrupt::USB);
     }
-
 
     let mut delay_time = 200i16;
     let mut delay_change = 100i16;
